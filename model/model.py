@@ -1,5 +1,5 @@
 from database.distributore_DAO import DistributoreDAO
-
+import copy
 '''
     MODELLO:
     - Rappresenta la struttura dati
@@ -25,7 +25,21 @@ class Model:
         :param mese: Mese selezionato (un intero da 1 a 12)
         :return: lista di tuple --> (nome del distributore, media), es. (Distributore A, 1.789)
         """
-        # TODO
+        risultati=[]
+        #itero su tutti gli oggetti Distributore caricati in memoria tramite ORM
+        for distributore in self._distributori:
+            prezzi_mese=[
+                p.prezzo_litro for p in distributore.get_prezzi()
+                if p.data.month == mese
+            ]
+
+            if prezzi_mese:
+                media=sum(prezzi_mese)/len(prezzi_mese)
+                risultati.append((distributore.nome, round(media,3)))
+            else:
+                risultati.append((distributore.nome, 0.0))
+        return risultati
+
 
     def get_sequenza_ottima(self, mese:int):
         """
@@ -46,11 +60,59 @@ class Model:
 
     def __ricorsione(self, sequenza_parziale, giorno, ultimo_distributore, costo_corrente, prezzi_settimana):
         """ Implementa la ricorsione """
-        # TODO
+        if giorno==8:
+            if self.__costo_ottimo==-1 or costo_corrente < self.__costo_ottimo:
+                self.__costo_ottimo = costo_corrente
+                self.__sequenza_ottima= copy.deepcopy(sequenza_parziale)
+            return
+
+        for distributore in self._distributori:
+            #calcolo del costo parziale del giorno corrente
+            prezzo_litro=prezzi_settimana[distributore.id][giorno-1]
+            costo_rifornimento=prezzo_litro*100
+
+            #costo fisso di spostamento: 5 euro se non è
+            #il primo giorno e si cambia distributore rispetto a ieri
+            costo_spostamento=0
+            if ultimo_distributore is not None and ultimo_distributore!=distributore.id:
+                costo_spostamento= 5
+
+            nuovo_costo=costo_corrente+costo_rifornimento+costo_spostamento
+
+            if self.__costo_ottimo==-1 or nuovo_costo<self.__costo_ottimo:
+                sequenza_parziale.append(distributore.id)
+
+                #chiamata ricorsiva al giorno successivo, aggiornando ultimo_distributore
+                #e costo_corrente
+                self.__ricorsione(
+                    sequenza_parziale,
+                    giorno+1,
+                    distributore.id,
+                    nuovo_costo,
+                    prezzi_settimana
+                )
+
+                sequenza_parziale.pop()
+                #rimuovo l'ultima scelta per esplorare l'altro distributore
 
     def __get_prezzi_prima_settimana_mese(self, mese: int):
         """
         Restituisce i prezzi dei primi 7 giorni del mese selezionato per ciascun distributore.
         :return: un dizionario: {id_distributore: [prezzo_giorno1, ..., prezzo_giorno7]}
         """
-        # TODO
+        prezzi_settimana={}
+        for distributore in self._distributori:
+            #filtro i prezzi del mese selezionato e li
+            #ordino per data crescente (dall'1 al 31)
+            prezzi_mese_ordinati=sorted(
+                [p for p in distributore.get_prezzi() if p.data.month==mese],
+                key=lambda x:x.data
+            )
+
+            #estraggo solo i valori prezzo_litro dei primi 7 giorni
+            prezzi_7_giorni= [p.prezzo_litro for p in prezzi_mese_ordinati[:7]]
+
+            #associo la lista dei 7 prezzi all'ID del distributore nel dizionario
+            prezzi_settimana[distributore.id]=prezzi_7_giorni
+
+        return prezzi_settimana
